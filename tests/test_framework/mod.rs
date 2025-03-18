@@ -44,6 +44,7 @@ use coinswap::{
 };
 
 const BITCOIN_VERSION: &str = "28.1";
+const REGTEST_TAKER_ID: &[&str] = &["7102", "17102", "27102", "37102", "47102"];
 
 fn download_bitcoind_tarball(download_url: &str, retries: usize) -> Vec<u8> {
     for attempt in 1..=retries {
@@ -485,7 +486,7 @@ impl TestFramework {
     #[allow(clippy::type_complexity)]
     pub fn init(
         makers_config_map: Vec<((u16, Option<u16>), MakerBehavior)>,
-        taker_config: Vec<(u16, TakerBehavior)>,
+        taker_behavior: Vec<TakerBehavior>,
         connection_type: ConnectionType,
     ) -> (
         Arc<Self>,
@@ -531,15 +532,16 @@ impl TestFramework {
 
         // Create the Taker.
         let taker_rpc_config = rpc_config.clone();
-        let takers = taker_config
+        let takers = taker_behavior
             .into_iter()
-            .map(|(port, behavior)| {
+            .enumerate()
+            .map(|(i, behavior)| {
                 Taker::init(
-                    Some(temp_dir.join(format!("taker{}", port))),
+                    Some(temp_dir.join(format!("taker{}", REGTEST_TAKER_ID[i]))),
                     None,
                     Some(taker_rpc_config.clone()),
                     behavior,
-                    Some(port),
+                    None,
                     None,
                     Some(connection_type),
                 )
@@ -547,8 +549,8 @@ impl TestFramework {
             })
             .collect::<Vec<_>>();
         let mut base_rpc_port = 3500; // Random port for RPC connection in tests. (Not used)
-                                      // Create the Makers as per given configuration map.
-        let makers = makers_config_map
+
+        let makers = makers_config_map // Create the Makers as per given configuration map.
             .into_iter()
             .map(|(port, behavior)| {
                 base_rpc_port += 1;

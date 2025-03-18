@@ -1,6 +1,6 @@
 #![cfg(feature = "integration-test")]
 use std::{
-    sync::{atomic::Ordering::Relaxed, Arc, Mutex},
+    sync::{atomic::Ordering::Relaxed, Arc},
     thread,
     time::Duration,
 };
@@ -20,9 +20,9 @@ use test_framework::*;
 /// Multiple Takers with Different Behaviors
 /// This test demonstrates a scenario where a single Maker is connected to multiple Takers
 /// exhibiting different behaviors:
-/// - Taker1: Normal
-/// - Taker2: Broadcasts contract transactions after full setup
-/// - Taker3: Drops connection after full setup
+/// - Taker1: Broadcasts contract transactions after full setup
+/// - Taker2: Drops connection after full setup
+/// - Taker3: Normal
 ///
 /// The test verifies that the Maker can properly manage multiple concurrent swaps with
 /// different taker behaviors and recover appropriately in each case if required.
@@ -32,10 +32,11 @@ fn mutli_taker_single_maker_swap() {
         ((6102, None), MakerBehavior::Normal),
         ((16102, None), MakerBehavior::Normal),
     ];
+
     let taker_behavior = vec![
-        TakerBehavior::Normal,
         TakerBehavior::BroadcastContractAfterFullSetup,
         TakerBehavior::DropConnectionAfterFullSetup,
+        TakerBehavior::Normal,
     ];
     // Initiate test framework, Makers.
     // Taker has normal behavior.
@@ -112,47 +113,19 @@ fn mutli_taker_single_maker_swap() {
     log::info!("Initiating coinswap protocol for multiple takers");
 
     // Spawn threads for each taker to initiate coinswap concurrently
-    // thread::scope(|s| {
-    //     for taker in &mut takers {
-    //         let swap_params = SwapParams {
-    //             send_amount: Amount::from_sat(500000),
-    //             maker_count: 2,
-    //             tx_count: 3,
-    //             required_confirms: 1,
-    //         };
-    //         s.spawn(move || {
-    //             let _a = taker.do_coinswap(swap_params);
-    //         });
-    //     }
-    // });
-    // Spawn threads for each taker to initiate coinswap concurrently
-    let mut takers_arc = takers
-        .into_iter()
-        .map(|t| Arc::new(Mutex::new(t)))
-        .collect::<Vec<_>>();
-    let taker_threads = takers_arc
-        .iter_mut()
-        .map(|taker| {
-            let taker_clone = taker.clone();
-            thread::spawn(move || {
-                // Swap params for coinswap
-                let swap_params = SwapParams {
-                    send_amount: Amount::from_sat(500000),
-                    maker_count: 2,
-                    tx_count: 3,
-                    required_confirms: 1,
-                };
-                let res = taker_clone.lock().unwrap().do_coinswap(swap_params);
-                while res.is_err() {
-                    thread::sleep(Duration::from_secs(10));
-                }
-            })
-        })
-        .collect::<Vec<_>>();
-    // Wait for taker threads to complete
-    for thread in taker_threads {
-        let _ = thread.join();
-    }
+    thread::scope(|s| {
+        for taker in &mut takers {
+            let swap_params = SwapParams {
+                send_amount: Amount::from_sat(500000),
+                maker_count: 2,
+                tx_count: 3,
+                required_confirms: 1,
+            };
+            s.spawn(move || {
+                let _a = taker.do_coinswap(swap_params);
+            });
+        }
+    });
 
     // After Swap is done, wait for maker threads to conclude
     makers
@@ -169,14 +142,14 @@ fn mutli_taker_single_maker_swap() {
     directory_server_instance.shutdown.store(true, Relaxed);
     thread::sleep(Duration::from_secs(10));
 
-    // For Taker1 (DropConnectionAfterFullSetup), run recovery
+    // For Taker2 (DropConnectionAfterFullSetup), run recovery
     warn!("Starting Taker recovery process");
-    takers_arc[2].lock().unwrap().recover_from_swap().unwrap();
+    takers[1].recover_from_swap().unwrap();
 
     // Verify final state for all participants
-    for (i, taker) in takers_arc.iter().enumerate() {
+    for (i, taker) in takers.iter().enumerate() {
         verify_swap_results(
-            &taker.lock().unwrap(),
+            taker,
             &makers,
             org_taker_spend_balances[i],
             org_maker_spend_balances.clone(),
