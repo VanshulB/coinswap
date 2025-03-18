@@ -168,7 +168,8 @@ pub struct Taker {
     offerbook: OfferBook,
     ongoing_swap_state: OngoingSwapState,
     behavior: TakerBehavior,
-    data_dir: PathBuf,
+    /// Data dir
+    pub data_dir: PathBuf,
 }
 
 impl Drop for Taker {

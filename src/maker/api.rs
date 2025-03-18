@@ -241,7 +241,7 @@ pub struct Maker {
     /// Is setup complete
     pub is_setup_complete: AtomicBool,
     /// Path for the data directory.
-    pub(crate) data_dir: PathBuf,
+    pub data_dir: PathBuf,
     /// Thread pool for managing all spawned threads
     pub(crate) thread_pool: Arc<ThreadPool>,
 }
