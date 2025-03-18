@@ -1,7 +1,7 @@
 on:
   push:
     branches:
-      - master
+      [ "master", "test_new" ]
   pull_request:
 
 name: test
