@@ -2,6 +2,7 @@ on:
   push:
     branches:
       - master
+      - test_new
   pull_request:
 
 name: test
